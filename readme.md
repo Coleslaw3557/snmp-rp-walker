@@ -1,6 +1,6 @@
 # Network Device Report Generator
 
-This Python script generates comprehensive network device reports using SNMP. It can query multiple devices for information about system details, BGP peers, OSPF neighbors, and interfaces, supporting multiple VRFs through different SNMP community strings. This script was designed specifically for IOS-XR Devices running 7.x. I'm open to pull requests if you want to add additional support.
+The script will catalog Interfaces, OSPF adjacencies, and BGP peers in the up/full/estbalished state and spit out the specific OID that can be used in your NMS to monitor the state of that connection. This is helpful when building out your monitoring infrastructure and want specific OIDs to keep an eye on. The script will also help identif IPv6 peers since IOSXR currently doesn't list v6 BGP Peers in a human readable way like v4 (thanks for that Cisco...). This script was tested against IOS-XR 7.x but I might expand it in the future.
 
 ## Features
 
