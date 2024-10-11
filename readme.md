@@ -91,6 +91,70 @@ python network_report_generator.py public public-internet -f hosts.txt
 
 The script generates a Markdown file named `network_report.md` containing the collected information for each scanned IP address, including data from all queried VRFs.
 
+
+## Example Output
+
+```
+$python3 network_report_generator.py public public-internet -i www.xxx.yyy.zzz
+
+2024-10-11 12:27:28,646 - INFO - Using default community: public
+2024-10-11 12:27:28,646 - INFO - Additional communities: public-internet
+2024-10-11 12:27:28,646 - INFO - Scanning 1 IP address(es)
+2024-10-11 12:27:28,646 - INFO - Querying device info, BGP peers, OSPF neighbors, and interfaces for www.xxx.yyy.zzz...
+2024-10-11 12:27:28,646 - INFO - Getting device info for www.xxx.yyy.zzz
+2024-10-11 12:27:28,975 - INFO - Starting BGP peer discovery for www.xxx.yyy.zzz
+2024-10-11 12:27:28,976 - INFO - Querying with community: public
+2024-10-11 12:27:31,767 - INFO - Querying with community: public-internet
+2024-10-11 12:27:37,350 - INFO - Starting OSPF neighbor discovery for www.xxx.yyy.zzz
+2024-10-11 12:27:37,351 - INFO - Querying with community: public
+2024-10-11 12:27:39,287 - INFO - Querying with community: public-internet
+2024-10-11 12:27:41,221 - INFO - Found 3 unique OSPF neighbors
+2024-10-11 12:27:41,221 - INFO - Starting get_interfaces function for www.xxx.yyy.zzz
+2024-10-11 12:27:57,334 - INFO - Total up interfaces for www.xxx.yyy.zzz: 18
+2024-10-11 12:27:57,335 - INFO - Completed report for www.xxx.yyy.zzz
+2024-10-11 12:27:57,336 - INFO - Report generation completed. Saved to network_report.md
+```
+
+# Network Device Report
+
+Report generated at: 2024-10-11 12:27:28
+
+# Network Device Report for <ip address>
+
+Report generated at: 2024-10-11 12:27:57
+
+## Device Information
+
+| Attribute | Value |
+|-----------|-------|
+| sysName | exciting.potato.local |
+| sysDescr | Cisco IOS XR Software, Version 7.7.21  Copyright (c) 2013-2023 by Cisco Systems, Inc. |
+| sysUpTime | Timeticks: (639352884) 73 days, 23:58:48.84 |
+| sysContact | Mr.Nagios |
+| sysLocation | Hell |
+
+## BGP Peers
+
+| Neighbor | Type | AS | State | State OID | Community |
+|----------|------|----|---------|-----------|-----------|
+
+
+## OSPF Neighbors
+
+| Neighbor IP | State | State Meaning | StateOID | Community |
+|-------------|-------|---------------|----------|----------|
+
+
+## Interfaces
+
+Total up interfaces:
+
+| Interface | Description | Status | Status OID |
+|-----------|-------------|--------|------------|
+
+---
+
+
 ## Notes
 
 - Ensure you have the necessary permissions to perform SNMP queries on the target devices.
