@@ -8,6 +8,20 @@ from typing import Dict, Any, List
 from datetime import datetime
 from dataclasses import dataclass
 
+@dataclass
+class SNMPCredentials:
+    version: str
+    community: str = None
+    username: str = None
+    auth_protocol: str = None
+    auth_password: str = None
+    priv_protocol: str = None
+    priv_password: str = None
+    context: str = None
+
+# Import SNMPCredentials from where it's defined
+from snmp_credentials import SNMPCredentials
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
