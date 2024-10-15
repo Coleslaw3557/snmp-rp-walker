@@ -19,9 +19,6 @@ class SNMPCredentials:
     priv_password: str = None
     context: str = None
 
-# Import SNMPCredentials from where it's defined
-from snmp_credentials import SNMPCredentials
-
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
