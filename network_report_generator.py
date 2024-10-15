@@ -19,6 +19,9 @@ class SNMPCredentials:
     priv_password: str = None
     context: str = None
 
+    def __repr__(self):
+        return f"SNMPCredentials(version='{self.version}', community={self.community}, username='{self.username}', auth_protocol='{self.auth_protocol}', priv_protocol='{self.priv_protocol}', context='{self.context}')"
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -298,20 +301,20 @@ def generate_markdown(ip: str, credentials: List[SNMPCredentials]) -> str:
     # BGP Peers
     markdown += "## BGP Peers\n\n"
     if bgp_peers:
-        markdown += "| Neighbor | Type | AS | State | State OID | Community |\n"
-        markdown += "|----------|------|----|---------|-----------|-----------|\n"
+        markdown += "| Neighbor | Type | AS | State | State OID | Context |\n"
+        markdown += "|----------|------|----|---------|-----------|---------|\n"
         for peer_address, info in bgp_peers.items():
-            markdown += f"| {info['address']} | {info['type']} | {info['remote_as']} | {info['state']} | {info['state_oid']} | {info['community']} |\n"
+            markdown += f"| {info['address']} | {info['type']} | {info['remote_as']} | {info['state']} | {info['state_oid']} | {info.get('context', 'N/A')} |\n"
     else:
         markdown += "No BGP peers found\n"
 
     # OSPF Neighbors
     markdown += "\n## OSPF Neighbors\n\n"
     if ospf_neighbors:
-        markdown += "| Neighbor IP | State | State Meaning | StateOID | Community |\n"
-        markdown += "|-------------|-------|---------------|----------|----------|\n"
+        markdown += "| Neighbor IP | State | State Meaning | StateOID | Context |\n"
+        markdown += "|-------------|-------|---------------|----------|--------|\n"
         for neighbor in ospf_neighbors:
-            markdown += f"| {neighbor['ip']} | {neighbor['state']} | {neighbor['state_meaning']} | {neighbor['state_oid']} | {neighbor['community']} |\n"
+            markdown += f"| {neighbor['ip']} | {neighbor['state']} | {neighbor['state_meaning']} | {neighbor['state_oid']} | {neighbor.get('context', 'N/A')} |\n"
     else:
         markdown += "No OSPF neighbors found\n"
 
@@ -361,31 +364,23 @@ def parse_arguments():
     return parser.parse_args()
 
 def create_snmp_credentials(args):
-    if args.v2c:
-        return [SNMPCredentials(version="2c", community=comm) for comm in args.community]
-    elif args.v3:
-        creds = [SNMPCredentials(
+    if args.v3:
+        base_cred = SNMPCredentials(
             version="3",
             username=args.username or os.environ.get("SNMP_USERNAME"),
             auth_protocol=args.auth_protocol,
             auth_password=args.auth_password or os.environ.get("SNMP_AUTH_PASSWORD"),
             priv_protocol=args.priv_protocol,
             priv_password=args.priv_password or os.environ.get("SNMP_PRIV_PASSWORD")
-        )]
+        )
+        creds = [base_cred]  # No context
         if args.context:
             for ctx in args.context:
-                creds.append(SNMPCredentials(
-                    version="3",
-                    username=args.username or os.environ.get("SNMP_USERNAME"),
-                    auth_protocol=args.auth_protocol,
-                    auth_password=args.auth_password or os.environ.get("SNMP_AUTH_PASSWORD"),
-                    priv_protocol=args.priv_protocol,
-                    priv_password=args.priv_password or os.environ.get("SNMP_PRIV_PASSWORD"),
-                    context=ctx
-                ))
+                if ctx:  # Skip empty context as it's already covered
+                    creds.append(SNMPCredentials(**{**base_cred.__dict__, 'context': ctx}))
         return creds
     else:
-        raise ValueError("Either --v2c or --v3 must be specified")
+        raise ValueError("SNMPv3 must be specified with --v3")
 
 def read_hosts_from_file(filename):
     try:
