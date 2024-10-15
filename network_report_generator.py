@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 def get_timestamp():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-def get_device_info(ip: str, community: str) -> Dict[str, str]:
+def get_device_info(ip: str, credentials: SNMPCredentials) -> Dict[str, str]:
     logger.info(f"Getting device info for {ip}")
     info = {}
     oids = {
@@ -39,7 +39,14 @@ def get_device_info(ip: str, community: str) -> Dict[str, str]:
         'sysLocation': '1.3.6.1.2.1.1.6.0'
     }
     for key, oid in oids.items():
-        cmd = f"snmpget -v2c -c {community} -On {ip} {oid}"
+        if credentials.version == "2c":
+            cmd = f"snmpget -v2c -c {credentials.community} -On {ip} {oid}"
+        else:  # SNMPv3
+            cmd = f"snmpget -v3 -l authPriv -u {credentials.username} -a {credentials.auth_protocol} -A {credentials.auth_password} -x {credentials.priv_protocol} -X {credentials.priv_password}"
+            if credentials.context:
+                cmd += f" -n {credentials.context}"
+            cmd += f" -On {ip} {oid}"
+        
         result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
         output = result.stdout.strip()
         if output:
