@@ -146,22 +146,21 @@ def parse_snmp_output(output: str) -> Dict[str, Dict[str, str]]:
 
     return result
 
-def get_bgp_peers(ip: str, default_community: str, additional_communities: List[str]) -> Dict[str, Dict[str, Any]]:
+def get_bgp_peers(ip: str, credentials: List[SNMPCredentials]) -> Dict[str, Dict[str, Any]]:
     logger.info(f"Starting BGP peer discovery for {ip}")
-    communities = [default_community] + additional_communities
     peers = {}
 
-    for community in communities:
-        logger.info(f"Querying with community: {community}")
+    for cred in credentials:
+        logger.info(f"Querying with credentials: {cred}")
         try:
-            output = run_snmpwalk(ip, community, BGP_PEER_OID)
+            output = run_snmpwalk(ip, cred, BGP_PEER_OID)
             if not output or "No Such Object available on this agent at this OID" in output:
-                logger.warning(f"No BGP peers found for {ip} with community {community}")
+                logger.warning(f"No BGP peers found for {ip} with credentials {cred}")
                 continue
             parsed_output = parse_snmp_output(output)
             logger.debug(f"Parsed output: {parsed_output}")
         except Exception as e:
-            logger.error(f"Error during SNMP walk for {ip} with community {community}: {str(e)}")
+            logger.error(f"Error during SNMP walk for {ip} with credentials {cred}: {str(e)}")
             logger.error(f"SNMP walk output: {output[:1000]}...")  # Log first 1000 characters of output
             continue
 
@@ -173,7 +172,7 @@ def get_bgp_peers(ip: str, default_community: str, additional_communities: List[
                     'state': 'unknown',
                     'state_oid': '',
                     'remote_as': 'N/A',
-                    'community': community
+                    'context': cred.context
                 }
 
             if '3' in peer_data:  # cbgpPeer2State
@@ -184,15 +183,14 @@ def get_bgp_peers(ip: str, default_community: str, additional_communities: List[
 
     return peers
 
-def get_ospf_neighbors(ip: str, default_community: str, additional_communities: List[str]) -> List[Dict[str, Any]]:
+def get_ospf_neighbors(ip: str, credentials: List[SNMPCredentials]) -> List[Dict[str, Any]]:
     logger.info(f"Starting OSPF neighbor discovery for {ip}")
-    communities = [default_community] + additional_communities
     all_neighbors = {}
 
-    for community in communities:
-        logger.info(f"Querying with community: {community}")
+    for cred in credentials:
+        logger.info(f"Querying with credentials: {cred}")
         try:
-            neighbors_output = run_snmpwalk(ip, community, OSPF_NEIGHBOR_OID)
+            neighbors_output = run_snmpwalk(ip, cred, OSPF_NEIGHBOR_OID)
             
             # Parse neighbor IPs
             neighbor_ips = {}
@@ -208,7 +206,7 @@ def get_ospf_neighbors(ip: str, default_community: str, additional_communities: 
             # Get states for each neighbor
             for neighbor_oids, neighbor_ip in neighbor_ips.items():
                 full_state_oid = f'{OSPF_NEIGHBOR_OID}.6.{neighbor_oids}'
-                state_output = run_snmpwalk(ip, community, full_state_oid)
+                state_output = run_snmpwalk(ip, cred, full_state_oid)
                 state = 'Unknown'
                 if state_output:
                     state_value = state_output.split(' = ')[-1].strip()
@@ -216,27 +214,30 @@ def get_ospf_neighbors(ip: str, default_community: str, additional_communities: 
                         state = state_value.split('INTEGER: ')[1]
                 state_meaning = OSPF_STATES.get(state, 'Unknown')
                 
-                # Only add or update if it's not already present (prioritize earlier communities)
+                # Only add or update if it's not already present (prioritize earlier credentials)
                 if neighbor_ip not in all_neighbors:
                     all_neighbors[neighbor_ip] = {
                         'ip': neighbor_ip,
                         'state': state,
                         'state_oid': full_state_oid,
                         'state_meaning': state_meaning,
-                        'community': community
+                        'context': cred.context
                     }
 
         except Exception as e:
-            logger.error(f"Error during OSPF neighbor discovery for {ip} with community {community}: {str(e)}")
+            logger.error(f"Error during OSPF neighbor discovery for {ip} with credentials {cred}: {str(e)}")
 
     logger.info(f"Found {len(all_neighbors)} unique OSPF neighbors")
     return list(all_neighbors.values())
 
-def get_interfaces(ip: str, community: str) -> List[Dict[str, Any]]:
+def get_interfaces(ip: str, credential: SNMPCredentials) -> List[Dict[str, Any]]:
     logger.info(f"Starting get_interfaces function for {ip}")
     
     def run_snmpwalk(oid: str) -> Dict[str, str]:
-        cmd = f"snmpwalk -v2c -c {community} {ip} {oid}"
+        cmd = f"snmpwalk -v3 -l authPriv -u {credential.username} -a {credential.auth_protocol} -A {credential.auth_password} -x {credential.priv_protocol} -X {credential.priv_password}"
+        if credential.context:
+            cmd += f" -n {credential.context}"
+        cmd += f" {ip} {oid}"
         result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
         output = result.stdout.strip().split('\n')
         if not output or output[0] == '':
