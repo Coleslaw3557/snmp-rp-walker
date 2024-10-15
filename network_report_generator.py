@@ -20,7 +20,7 @@ class SNMPCredentials:
     context: str = None
 
     def __repr__(self):
-        return f"SNMPCredentials(version='{self.version}', community={self.community}, username='{self.username}', auth_protocol='{self.auth_protocol}', priv_protocol='{self.priv_protocol}', context='{self.context}')"
+        return f"SNMPCredentials(version='{self.version}', username='{"*" * len(self.username) if self.username else None}', auth_protocol='{self.auth_protocol}', priv_protocol='{self.priv_protocol}', context='{self.context}')"
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -161,7 +161,7 @@ def get_bgp_peers(ip: str, credentials: List[SNMPCredentials]) -> Dict[str, Dict
     peers = {}
 
     for cred in credentials:
-        logger.info(f"Querying with credentials: {cred}")
+        logger.info(f"Querying BGP peers with SNMPv{cred.version} credentials")
         try:
             output = run_snmpwalk(ip, cred, BGP_PEER_OID)
             if not output or "No Such Object available on this agent at this OID" in output:
@@ -198,7 +198,7 @@ def get_ospf_neighbors(ip: str, credentials: List[SNMPCredentials]) -> List[Dict
     all_neighbors = {}
 
     for cred in credentials:
-        logger.info(f"Querying with credentials: {cred}")
+        logger.info(f"Querying OSPF neighbors with SNMPv{cred.version} credentials")
         try:
             neighbors_output = run_snmpwalk(ip, cred, OSPF_NEIGHBOR_OID)
             
