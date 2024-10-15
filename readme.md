@@ -30,12 +30,8 @@ The script will catalog Interfaces, OSPF adjacencies, and BGP peers in the up/fu
 ## Usage
 
 ```
-python network_report_generator.py <communities> [options]
+python network_report_generator.py [options]
 ```
-
-### Arguments:
-
-- `communities`: One or more SNMP community strings. Each community string may be associated with a different VRF.
 
 ### Options:
 
@@ -43,21 +39,50 @@ python network_report_generator.py <communities> [options]
 - `-i, --ips [IPS ...]`: IP address(es) to scan
 - `-l, --list`: List IP addresses from the file without scanning
 
+#### SNMPv2c options:
+- `--v2c`: Use SNMPv2c
+- `-c, --community [COMMUNITY ...]`: SNMP community string(s). The first one is used as default.
+
+#### SNMPv3 options:
+- `--v3`: Use SNMPv3
+- `-u, --username USERNAME`: SNMPv3 username
+- `-a, --auth-protocol {MD5,SHA}`: SNMPv3 authentication protocol
+- `-A, --auth-password AUTH_PASSWORD`: SNMPv3 authentication password
+- `-x, --priv-protocol {DES,AES}`: SNMPv3 privacy protocol
+- `-X, --priv-password PRIV_PASSWORD`: SNMPv3 privacy password
+- `-n, --context [CONTEXT ...]`: SNMPv3 context(s)
+
+### Environment Variables:
+
+The script supports the following environment variables for SNMPv3:
+
+- `SNMP_USERNAME`: SNMPv3 username
+- `SNMP_AUTH_PASSWORD`: SNMPv3 authentication password
+- `SNMP_PRIV_PASSWORD`: SNMPv3 privacy password
+
 ### Examples:
 
-1. Scan IP addresses from a file using two community strings (for different VRFs):
+1. Scan IP addresses from a file using SNMPv2c with two community strings:
    ```
-   python network_report_generator.py public public-internet -f hosts.txt
-   ```
-
-2. Scan specific IP addresses:
-   ```
-   python network_report_generator.py public -i 192.168.1.1 192.168.1.2
+   python network_report_generator.py --v2c -c public public-internet -f hosts.txt
    ```
 
-3. List IP addresses from a file without scanning:
+2. Scan specific IP addresses using SNMPv3:
    ```
-   python network_report_generator.py public -f hosts.txt -l
+   python network_report_generator.py --v3 -u myuser -a SHA -A myauthpass -x AES -X myprivpass -i 192.168.1.1 192.168.1.2
+   ```
+
+3. Scan using SNMPv3 with environment variables and a context:
+   ```
+   export SNMP_USERNAME=myuser
+   export SNMP_AUTH_PASSWORD=myauthpass
+   export SNMP_PRIV_PASSWORD=myprivpass
+   python network_report_generator.py --v3 -a SHA -x AES -n CTX-INTERNET -f hosts.txt
+   ```
+
+4. List IP addresses from a file without scanning:
+   ```
+   python network_report_generator.py --v2c -c public -f hosts.txt -l
    ```
 
 ## VRF and SNMP Community Configuration

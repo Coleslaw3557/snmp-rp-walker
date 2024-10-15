@@ -3,8 +3,10 @@ import subprocess
 import logging
 import ipaddress
 import argparse
+import os
 from typing import Dict, Any, List
 from datetime import datetime
+from dataclasses import dataclass
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -56,8 +58,15 @@ OSPF_STATES = {
 BGP_PEER_OID = '.1.3.6.1.4.1.9.9.187.1.2.5.1'
 OSPF_NEIGHBOR_OID = '1.3.6.1.2.1.14.10.1'
 
-def run_snmpwalk(ip: str, community: str, oid: str) -> str:
-    cmd = f"snmpwalk -v2c -c {community} -On {ip} {oid}"
+def run_snmpwalk(ip: str, credentials: SNMPCredentials, oid: str) -> str:
+    if credentials.version == "2c":
+        cmd = f"snmpwalk -v2c -c {credentials.community} -On {ip} {oid}"
+    else:  # SNMPv3
+        cmd = f"snmpwalk -v3 -l authPriv -u {credentials.username} -a {credentials.auth_protocol} -A {credentials.auth_password} -x {credentials.priv_protocol} -X {credentials.priv_password}"
+        if credentials.context:
+            cmd += f" -n {credentials.context}"
+        cmd += f" -On {ip} {oid}"
+    
     logger.debug(f"Running command: {cmd}")
     try:
         result = subprocess.run(cmd, shell=True, capture_output=True, text=True, encoding='latin-1')
@@ -257,11 +266,11 @@ def get_interfaces(ip: str, community: str) -> List[Dict[str, Any]]:
     logger.info(f"Total up interfaces for {ip}: {len(interfaces)}")
     return interfaces
 
-def generate_markdown(ip: str, default_community: str, additional_communities: List[str]) -> str:
-    device_info = get_device_info(ip, default_community)
-    bgp_peers = get_bgp_peers(ip, default_community, additional_communities)
-    ospf_neighbors = get_ospf_neighbors(ip, default_community, additional_communities)
-    interfaces = get_interfaces(ip, default_community)
+def generate_markdown(ip: str, credentials: List[SNMPCredentials]) -> str:
+    device_info = get_device_info(ip, credentials[0])
+    bgp_peers = get_bgp_peers(ip, credentials)
+    ospf_neighbors = get_ospf_neighbors(ip, credentials)
+    interfaces = get_interfaces(ip, credentials[0])
 
     markdown = f"# Network Device Report for {ip}\n\n"
     markdown += f"Report generated at: {get_timestamp()}\n\n"
@@ -307,13 +316,64 @@ def generate_markdown(ip: str, default_community: str, additional_communities: L
 
     return markdown
 
+@dataclass
+class SNMPCredentials:
+    version: str
+    community: str = None
+    username: str = None
+    auth_protocol: str = None
+    auth_password: str = None
+    priv_protocol: str = None
+    priv_password: str = None
+    context: str = None
+
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Network Device Report Generator")
-    parser.add_argument("communities", nargs="+", help="SNMP community string(s). The first one is used as default.")
     parser.add_argument("-f", "--file", help="File containing list of IP addresses to scan")
     parser.add_argument("-i", "--ips", nargs="*", help="IP address(es) to scan")
     parser.add_argument("-l", "--list", action="store_true", help="List IP addresses from the file without scanning")
+    
+    # SNMPv2c options
+    parser.add_argument("--v2c", action="store_true", help="Use SNMPv2c")
+    parser.add_argument("-c", "--community", nargs="+", help="SNMP community string(s). The first one is used as default.")
+    
+    # SNMPv3 options
+    parser.add_argument("--v3", action="store_true", help="Use SNMPv3")
+    parser.add_argument("-u", "--username", help="SNMPv3 username")
+    parser.add_argument("-a", "--auth-protocol", choices=["MD5", "SHA"], help="SNMPv3 authentication protocol")
+    parser.add_argument("-A", "--auth-password", help="SNMPv3 authentication password")
+    parser.add_argument("-x", "--priv-protocol", choices=["DES", "AES"], help="SNMPv3 privacy protocol")
+    parser.add_argument("-X", "--priv-password", help="SNMPv3 privacy password")
+    parser.add_argument("-n", "--context", nargs="+", help="SNMPv3 context(s)")
+    
     return parser.parse_args()
+
+def create_snmp_credentials(args):
+    if args.v2c:
+        return [SNMPCredentials(version="2c", community=comm) for comm in args.community]
+    elif args.v3:
+        creds = [SNMPCredentials(
+            version="3",
+            username=args.username or os.environ.get("SNMP_USERNAME"),
+            auth_protocol=args.auth_protocol,
+            auth_password=args.auth_password or os.environ.get("SNMP_AUTH_PASSWORD"),
+            priv_protocol=args.priv_protocol,
+            priv_password=args.priv_password or os.environ.get("SNMP_PRIV_PASSWORD")
+        )]
+        if args.context:
+            for ctx in args.context:
+                creds.append(SNMPCredentials(
+                    version="3",
+                    username=args.username or os.environ.get("SNMP_USERNAME"),
+                    auth_protocol=args.auth_protocol,
+                    auth_password=args.auth_password or os.environ.get("SNMP_AUTH_PASSWORD"),
+                    priv_protocol=args.priv_protocol,
+                    priv_password=args.priv_password or os.environ.get("SNMP_PRIV_PASSWORD"),
+                    context=ctx
+                ))
+        return creds
+    else:
+        raise ValueError("Either --v2c or --v3 must be specified")
 
 def read_hosts_from_file(filename):
     try:
@@ -325,10 +385,6 @@ def read_hosts_from_file(filename):
 
 def main():
     args = parse_arguments()
-    
-    # Set up communities
-    default_community = args.communities[0]
-    additional_communities = args.communities[1:]
     
     # Get list of IP addresses
     if args.file:
@@ -348,8 +404,8 @@ def main():
         logger.error("No valid IP addresses found.")
         sys.exit(1)
 
-    logger.info(f"Using default community: {default_community}")
-    logger.info(f"Additional communities: {', '.join(additional_communities)}")
+    credentials = create_snmp_credentials(args)
+    logger.info(f"Using SNMP version: {credentials[0].version}")
     logger.info(f"Scanning {len(ip_addresses)} IP address(es)")
 
     with open('network_report.md', 'w') as f:
@@ -359,7 +415,7 @@ def main():
         for ip in ip_addresses:
             logger.info(f"Querying device info, BGP peers, OSPF neighbors, and interfaces for {ip}...")
             try:
-                markdown_content = generate_markdown(ip, default_community, additional_communities)
+                markdown_content = generate_markdown(ip, credentials)
                 f.write(markdown_content)
                 f.write("\n\n---\n\n")  # Separator between reports for different IPs
                 logger.info(f"Completed report for {ip}")
