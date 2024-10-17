@@ -274,18 +274,24 @@ def get_interfaces(ip: str, credential: SNMPCredentials) -> List[Dict[str, Any]]
             if_index = full_oid.split('.')[-1]
             name_oid = f'IF-MIB::ifDescr.{if_index}'
             desc_oid = f'IF-MIB::ifAlias.{if_index}'
+            interface_name = name_data.get(name_oid, 'Unknown').split(': ', 1)[-1].strip('"')
+            
+            # Skip Null, Optics, and Mgmt interfaces
+            if interface_name.startswith(('Null', 'Optics', 'MgmtEth')):
+                continue
+            
             description = description_data.get(desc_oid, 'STRING: ').split(': ', 1)[-1].strip('"')
             if description == 'STRING:':
                 description = ''
             interface = {
-                'name': name_data.get(name_oid, 'Unknown').split(': ', 1)[-1].strip('"'),
+                'name': interface_name,
                 'description': description,
                 'status': 'up',
                 'status_oid': full_oid.replace('IF-MIB::ifOperStatus', '1.3.6.1.2.1.2.2.1.8')
             }
             interfaces.append(interface)
     
-    logger.info(f"Total up interfaces for {ip}: {len(interfaces)}")
+    logger.info(f"Total up interfaces for {ip} (excluding Null, Optics, and Mgmt): {len(interfaces)}")
     return interfaces
 
 def generate_markdown(ip: str, credentials: List[SNMPCredentials]) -> Tuple[str, Dict[str, Any]]:
@@ -329,21 +335,21 @@ def generate_markdown(ip: str, credentials: List[SNMPCredentials]) -> Tuple[str,
 
     # Interfaces
     markdown += f"\n## Interfaces\n\n"
-    markdown += f"Total up interfaces: {len(interfaces)}\n\n"
+    markdown += f"Total up interfaces (excluding Null, Optics, and Mgmt): {len(interfaces)}\n\n"
     if interfaces:
         markdown += "| Interface | Description | Status | Status OID |\n"
         markdown += "|-----------|-------------|--------|------------|\n"
         for interface in interfaces:
             markdown += f"| {interface['name']} | {interface['description']} | {interface['status']} | {interface['status_oid']} |\n"
     else:
-        markdown += "No up interfaces found\n"
+        markdown += "No up interfaces found (excluding Null, Optics, and Mgmt)\n"
 
     overview_data = {
         'hostname': hostname,
         'ip': ip,
         'bgp_count': len(bgp_peers),
         'ospf_count': len(ospf_neighbors),
-        'interface_count': len(interfaces)
+        'interface_count': len(interfaces)  # This now excludes Null, Optics, and Mgmt interfaces
     }
 
     return markdown, overview_data
