@@ -181,13 +181,16 @@ def get_bgp_peers(ip: str, credentials: List[SNMPCredentials]) -> Dict[str, Dict
                     'address': peer_address,
                     'type': 'IPv6' if ':' in peer_address else 'IPv4',
                     'state': 'unknown',
+                    'state_meaning': 'unknown',
                     'state_oid': '',
                     'remote_as': 'N/A',
                     'context': cred.context
                 }
 
             if '3' in peer_data:  # cbgpPeer2State
-                peers[peer_address]['state'] = BGP_STATES.get(peer_data['3']['value'].split()[-1], 'unknown')
+                raw_state = peer_data['3']['value'].split()[-1]
+                peers[peer_address]['state'] = raw_state
+                peers[peer_address]['state_meaning'] = BGP_STATES.get(raw_state, 'unknown')
                 peers[peer_address]['state_oid'] = peer_data['3']['oid']
             if '11' in peer_data:  # cbgpPeer2RemoteAs
                 peers[peer_address]['remote_as'] = peer_data['11']['value'].split()[-1]
@@ -319,10 +322,10 @@ def generate_markdown(ip: str, credentials: List[SNMPCredentials]) -> Tuple[str,
     # BGP Peers
     markdown += "## BGP Peers\n\n"
     if bgp_peers:
-        markdown += "| Neighbor | Type | AS | State | State OID | Context |\n"
-        markdown += "|----------|------|----|---------|-----------|---------|\n"
+        markdown += "| Neighbor | Type | AS | State | State Meaning | State OID | Context |\n"
+        markdown += "|----------|------|----|---------|--------------|-----------|---------|\n"
         for peer_address, info in bgp_peers.items():
-            markdown += f"| {info['address']} | {info['type']} | {info['remote_as']} | {info['state']} | {info['state_oid']} | {info.get('context', 'N/A')} |\n"
+            markdown += f"| {info['address']} | {info['type']} | {info['remote_as']} | {info['state']} | {info['state_meaning']} | {info['state_oid']} | {info.get('context', 'N/A')} |\n"
     else:
         markdown += "No BGP peers found\n"
 
