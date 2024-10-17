@@ -413,6 +413,19 @@ def read_hosts_from_file(filename):
         logger.error(f"Hosts file '{filename}' not found.")
         return []
 
+def generate_overview_table(devices_overview):
+    table = "# Device Overview\n\n"
+    table += "| Hostname | IP Address | BGP Peers | OSPF Neighbors | Interfaces |\n"
+    table += "|----------|------------|-----------|----------------|------------|\n"
+    for device in devices_overview:
+        hostname = device['hostname']
+        ip = device['ip']
+        bgp_count = device['bgp_count']
+        ospf_count = device['ospf_count']
+        interface_count = device['interface_count']
+        table += f"| [{hostname}](#{hostname.lower().replace(' ', '-')}) | {ip} | {bgp_count} | {ospf_count} | {interface_count} |\n"
+    return table + "\n"
+
 def main():
     args = parse_arguments()
     
