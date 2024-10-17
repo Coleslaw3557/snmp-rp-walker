@@ -161,16 +161,17 @@ def get_bgp_peers(ip: str, credentials: List[SNMPCredentials]) -> Dict[str, Dict
     peers = {}
 
     for cred in credentials:
-        logger.info(f"Querying BGP peers with SNMPv{cred.version} credentials")
+        context_info = f" with context '{cred.context}'" if cred.context else ""
+        logger.info(f"Querying BGP peers with SNMPv{cred.version} credentials{context_info}")
         try:
             output = run_snmpwalk(ip, cred, BGP_PEER_OID)
             if not output or "No Such Object available on this agent at this OID" in output:
-                logger.warning(f"No BGP peers found for {ip}")
+                logger.warning(f"No BGP peers found for {ip}{context_info}")
                 continue
             parsed_output = parse_snmp_output(output)
             logger.debug(f"Parsed output: {parsed_output}")
         except Exception as e:
-            logger.error(f"Error during SNMP walk for {ip}: {str(e)}")
+            logger.error(f"Error during SNMP walk for {ip}{context_info}: {str(e)}")
             logger.error(f"SNMP walk output: {output[:1000]}...")  # Log first 1000 characters of output
             continue
 
@@ -198,7 +199,8 @@ def get_ospf_neighbors(ip: str, credentials: List[SNMPCredentials]) -> List[Dict
     all_neighbors = {}
 
     for cred in credentials:
-        logger.info(f"Querying OSPF neighbors with SNMPv{cred.version} credentials")
+        context_info = f" with context '{cred.context}'" if cred.context else ""
+        logger.info(f"Querying OSPF neighbors with SNMPv{cred.version} credentials{context_info}")
         try:
             neighbors_output = run_snmpwalk(ip, cred, OSPF_NEIGHBOR_OID)
             
@@ -235,13 +237,14 @@ def get_ospf_neighbors(ip: str, credentials: List[SNMPCredentials]) -> List[Dict
                     }
 
         except Exception as e:
-            logger.error(f"Error during OSPF neighbor discovery for {ip} with credentials {cred}: {str(e)}")
+            logger.error(f"Error during OSPF neighbor discovery for {ip}{context_info}: {str(e)}")
 
     logger.info(f"Found {len(all_neighbors)} unique OSPF neighbors")
     return list(all_neighbors.values())
 
 def get_interfaces(ip: str, credential: SNMPCredentials) -> List[Dict[str, Any]]:
-    logger.info(f"Starting get_interfaces function for {ip}")
+    context_info = f" with context '{credential.context}'" if credential.context else ""
+    logger.info(f"Starting get_interfaces function for {ip}{context_info}")
     
     def run_snmpwalk(oid: str) -> Dict[str, str]:
         cmd = f"snmpwalk -v3 -l authPriv -u {credential.username} -a {credential.auth_protocol} -A {credential.auth_password} -x {credential.priv_protocol} -X {credential.priv_password}"
