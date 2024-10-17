@@ -165,12 +165,12 @@ def get_bgp_peers(ip: str, credentials: List[SNMPCredentials]) -> Dict[str, Dict
         try:
             output = run_snmpwalk(ip, cred, BGP_PEER_OID)
             if not output or "No Such Object available on this agent at this OID" in output:
-                logger.warning(f"No BGP peers found for {ip} with credentials {cred}")
+                logger.warning(f"No BGP peers found for {ip}")
                 continue
             parsed_output = parse_snmp_output(output)
             logger.debug(f"Parsed output: {parsed_output}")
         except Exception as e:
-            logger.error(f"Error during SNMP walk for {ip} with credentials {cred}: {str(e)}")
+            logger.error(f"Error during SNMP walk for {ip}: {str(e)}")
             logger.error(f"SNMP walk output: {output[:1000]}...")  # Log first 1000 characters of output
             continue
 
