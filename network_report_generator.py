@@ -4,7 +4,7 @@ import logging
 import ipaddress
 import argparse
 import os
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Tuple
 from datetime import datetime
 from dataclasses import dataclass
 
@@ -288,13 +288,15 @@ def get_interfaces(ip: str, credential: SNMPCredentials) -> List[Dict[str, Any]]
     logger.info(f"Total up interfaces for {ip}: {len(interfaces)}")
     return interfaces
 
-def generate_markdown(ip: str, credentials: List[SNMPCredentials]) -> str:
+def generate_markdown(ip: str, credentials: List[SNMPCredentials]) -> Tuple[str, Dict[str, Any]]:
     device_info = get_device_info(ip, credentials[0])
     bgp_peers = get_bgp_peers(ip, credentials)
     ospf_neighbors = get_ospf_neighbors(ip, credentials)
     interfaces = get_interfaces(ip, credentials[0])
 
-    markdown = f"# Network Device Report for {ip}\n\n"
+    hostname = device_info.get('sysName', 'Unknown')
+    
+    markdown = f"# Network Device Report for {hostname} ({ip})\n\n"
     markdown += f"Report generated at: {get_timestamp()}\n\n"
 
     # Device Information
@@ -336,7 +338,15 @@ def generate_markdown(ip: str, credentials: List[SNMPCredentials]) -> str:
     else:
         markdown += "No up interfaces found\n"
 
-    return markdown
+    overview_data = {
+        'hostname': hostname,
+        'ip': ip,
+        'bgp_count': len(bgp_peers),
+        'ospf_count': len(ospf_neighbors),
+        'interface_count': len(interfaces)
+    }
+
+    return markdown, overview_data
 
 @dataclass
 class SNMPCredentials:
@@ -422,21 +432,44 @@ def main():
     logger.info(f"Using SNMP version: {credentials[0].version}")
     logger.info(f"Scanning {len(ip_addresses)} IP address(es)")
 
+    devices_overview = []
+    device_reports = []
+
+    for ip in ip_addresses:
+        logger.info(f"Querying device info, BGP peers, OSPF neighbors, and interfaces for {ip}...")
+        try:
+            markdown_content, overview_data = generate_markdown(ip, credentials)
+            devices_overview.append(overview_data)
+            device_reports.append(markdown_content)
+            logger.info(f"Completed report for {ip}")
+        except Exception as e:
+            logger.error(f"Error generating report for {ip}: {str(e)}")
+
     with open('network_report.md', 'w') as f:
         f.write("# Network Device Report\n\n")
         f.write(f"Report generated at: {get_timestamp()}\n\n")
-
-        for ip in ip_addresses:
-            logger.info(f"Querying device info, BGP peers, OSPF neighbors, and interfaces for {ip}...")
-            try:
-                markdown_content = generate_markdown(ip, credentials)
-                f.write(markdown_content)
-                f.write("\n\n---\n\n")  # Separator between reports for different IPs
-                logger.info(f"Completed report for {ip}")
-            except Exception as e:
-                logger.error(f"Error generating report for {ip}: {str(e)}")
+        
+        # Add the overview table
+        f.write(generate_overview_table(devices_overview))
+        
+        # Write individual device reports
+        for report in device_reports:
+            f.write(report)
+            f.write("\n\n---\n\n")  # Separator between reports for different IPs
 
     logger.info("Report generation completed. Saved to network_report.md")
 
 if __name__ == "__main__":
     main()
+def generate_overview_table(devices_overview):
+    table = "# Device Overview\n\n"
+    table += "| Hostname | IP Address | BGP Peers | OSPF Neighbors | Interfaces |\n"
+    table += "|----------|------------|-----------|----------------|------------|\n"
+    for device in devices_overview:
+        hostname = device['hostname']
+        ip = device['ip']
+        bgp_count = device['bgp_count']
+        ospf_count = device['ospf_count']
+        interface_count = device['interface_count']
+        table += f"| [{hostname}](#{hostname.lower().replace(' ', '-')}) | {ip} | {bgp_count} | {ospf_count} | {interface_count} |\n"
+    return table + "\n"
